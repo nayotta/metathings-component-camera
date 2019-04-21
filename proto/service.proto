@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package ai.metathings.component.service.camera;
+option go_package = "camera";
+
+import "google/protobuf/empty.proto";
+
+service CameraService {
+	rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+	rpc Stop(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+}
