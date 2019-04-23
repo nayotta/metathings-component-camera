@@ -2,6 +2,8 @@ package camera_driver
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math/rand"
 	"os/exec"
 	"path"
@@ -29,13 +31,13 @@ import (
  *         extra: [ ... ]  // list of extra arguments for codec.
  *     output:
  *       format: <format>  // file format, like `flv` etc.
- *       file: <path>  // file path, like `rtmp://rtmp-server:1935/path`.
- *     // ffmpeg_command: <template-string>  // template string for ffmpeg, default: constant variable `FFMPEG_SIMPLE_CAMERA_DRIVER_DEFAULT_TEMPLATE`.
+ *       file_prefix: <path>  // file path prefix, like `rtmp://rtmp-server:1935/path`.
+ *     // ffmpeg_template: <template-string>  // template string for ffmpeg, default: constant variable `FFMPEG_SIMPLE_CAMERA_DRIVER_DEFAULT_TEMPLATE`.
  */
 
 const (
 	FFMPEG_SIMPLE_CAMERA_DRIVER_DEAFULT_TEMPLATE    = `{{ffmpeg_file}} -y -f {{video_input_format}} -i {{video_input_file}} -s {{video_input_frame_size}} -r {{video_input_frame_rate}} -c:v {{video_input_codec_name}} -b:v {{video_input_codec_bit_rate}} {{video_input_codec_extra}} -f {{output_format}} {{output_file}}`
-	FFMPEG_SIMPLE_CAMERA_DRIVER_DEAFULT_FFMPEG_FILE = `ffmepg`
+	FFMPEG_SIMPLE_CAMERA_DRIVER_DEAFULT_FFMPEG_FILE = `ffmpeg`
 )
 
 type FFmpegSimpleCameraDriver struct {
@@ -51,9 +53,13 @@ const _LIVEID_LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012
 func random_strings(n int) string {
 	buf := make([]byte, n)
 	for i := 0; i < n; i++ {
-		buf[i] = _LIVEID_LETTERS[rand.Intn(n)]
+		buf[i] = _LIVEID_LETTERS[rand.Intn(len(_LIVEID_LETTERS))]
 	}
 	return string(buf)
+}
+
+func new_invalid_config_error(key string) error {
+	return errors.New(fmt.Sprintf("invalid config: %s", key))
 }
 
 func (d *FFmpegSimpleCameraDriver) parse_ffmpeg_command() (string, error) {
@@ -67,78 +73,78 @@ func (d *FFmpegSimpleCameraDriver) parse_ffmpeg_command() (string, error) {
 
 	video_input := d.opt.Sub("video_input")
 	if video_input == nil {
-		return "", ErrInvalidConfig
+		return "", new_invalid_config_error("video_input")
 	}
 
 	if val := video_input.GetString("format"); val != "" {
 		cmd_opt["video_input_format"] = val
 	} else {
-		return "", ErrInvalidConfig
+		return "", new_invalid_config_error("video_input.format")
 	}
 
 	if val := video_input.GetString("file"); val != "" {
 		cmd_opt["video_input_file"] = val
 	} else {
-		return "", ErrInvalidConfig
+		return "", new_invalid_config_error("video_input.file")
 	}
 
 	if val := video_input.GetString("frame_size"); val != "" {
 		cmd_opt["video_input_frame_size"] = val
 	} else {
-		return "", ErrInvalidConfig
+		return "", new_invalid_config_error("video_inpout.frame_size")
 	}
 
 	if val := video_input.GetString("frame_rate"); val != "" {
 		cmd_opt["video_input_frame_rate"] = val
 	} else {
-		return "", ErrInvalidConfig
+		return "", new_invalid_config_error("video_input.frame_rate")
 	}
 
 	video_input_codec := video_input.Sub("codec")
 	if video_input_codec == nil {
-		return "", ErrInvalidConfig
+		return "", new_invalid_config_error("codec")
 	}
 
 	if val := video_input_codec.GetString("name"); val != "" {
 		cmd_opt["video_input_codec_name"] = val
 	} else {
-		return "", ErrInvalidConfig
+		return "", new_invalid_config_error("codec.name")
 	}
 
 	if val := video_input_codec.GetString("bit_rate"); val != "" {
 		cmd_opt["video_input_codec_bit_rate"] = val
 	} else {
-		return "", ErrInvalidConfig
+		return "", new_invalid_config_error("codec.bit_rate")
 	}
 
 	if val := video_input_codec.GetStringSlice("extra"); val != nil {
 		cmd_opt["video_input_codec_extra"] = strings.Join(val, " ")
 	} else {
-		return "", ErrInvalidConfig
+		return "", new_invalid_config_error("codec.extra")
 	}
 
 	output := d.opt.Sub("output")
 	if output == nil {
-		return "", ErrInvalidConfig
+		return "", new_invalid_config_error("output")
 	}
 
 	if val := output.GetString("format"); val != "" {
 		cmd_opt["output_format"] = val
 	} else {
-		return "", ErrInvalidConfig
+		return "", new_invalid_config_error("output.format")
 	}
 
-	if val := output.GetString("file"); val != "" {
+	if val := output.GetString("file_prefix"); val != "" {
 		cmd_opt["output_file"] = path.Join(val, random_strings(64))
 	} else {
-		return "", ErrInvalidConfig
+		return "", new_invalid_config_error("output.file_prefix")
 	}
 
 	var temp string
-	if val := d.opt.GetString("ffmpeg_command"); val != "" {
+	if val := d.opt.GetString("ffmpeg_template"); val != "" {
 		temp = val
 	} else {
-		temp = FFMPEG_SIMPLE_CAMERA_DRIVER_DEAFULT_FFMPEG_FILE
+		temp = FFMPEG_SIMPLE_CAMERA_DRIVER_DEAFULT_TEMPLATE
 	}
 
 	cmd_str, err := mustache.Render(temp, cmd_opt)

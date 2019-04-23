@@ -3,6 +3,8 @@ package camera_service
 import (
 	"context"
 
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -21,6 +23,27 @@ func (cs *CameraService) logger() log.FieldLogger {
 	return cs.module.Logger()
 }
 
+func (cs *CameraService) HANDLE_GRPC_Start(ctx context.Context, in *any.Any) (*any.Any, error) {
+	var err error
+	req := &empty.Empty{}
+
+	if err = ptypes.UnmarshalAny(in, req); err != nil {
+		return nil, err
+	}
+
+	res, err := cs.Start(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	out, err := ptypes.MarshalAny(res)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func (cs *CameraService) Start(ctx context.Context, _ *empty.Empty) (*empty.Empty, error) {
 	err := cs.driver.Start()
 	if err != nil {
@@ -31,6 +54,27 @@ func (cs *CameraService) Start(ctx context.Context, _ *empty.Empty) (*empty.Empt
 	cs.logger().Infof("camera started")
 
 	return &empty.Empty{}, nil
+}
+
+func (cs *CameraService) HANDLE_GRPC_Stop(ctx context.Context, in *any.Any) (*any.Any, error) {
+	var err error
+	req := &empty.Empty{}
+
+	if err = ptypes.UnmarshalAny(in, req); err != nil {
+		return nil, err
+	}
+
+	res, err := cs.Stop(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	out, err := ptypes.MarshalAny(res)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 func (cs *CameraService) Stop(ctx context.Context, _ *empty.Empty) (*empty.Empty, error) {
@@ -55,6 +99,7 @@ func (cs *CameraService) InitModuleService(m *component.Module) error {
 	if err != nil {
 		return err
 	}
+	cs.logger().WithField("driver", drv_opt.GetString("name")).Debugf("init camera driver")
 
 	return nil
 }
