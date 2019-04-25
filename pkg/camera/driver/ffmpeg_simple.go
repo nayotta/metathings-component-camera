@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"os/exec"
 	"path"
@@ -11,6 +12,10 @@ import (
 	"sync"
 
 	"github.com/cbroglie/mustache"
+	log "github.com/sirupsen/logrus"
+
+	opt_helper "github.com/nayotta/metathings/pkg/common/option"
+	component "github.com/nayotta/metathings/pkg/component"
 )
 
 /*
@@ -44,8 +49,10 @@ type FFmpegSimpleCameraDriver struct {
 	op_mtx      *sync.Mutex
 	cancel_func context.CancelFunc
 
-	opt *CameraDriverOption
-	st  *CameraDriverState
+	logger log.FieldLogger
+	mdl    *component.Module
+	opt    *CameraDriverOption
+	st     *CameraDriverState
 }
 
 const _LIVEID_LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -62,7 +69,18 @@ func new_invalid_config_error(key string) error {
 	return errors.New(fmt.Sprintf("invalid config: %s", key))
 }
 
-func (d *FFmpegSimpleCameraDriver) parse_ffmpeg_command() (string, error) {
+func (d *FFmpegSimpleCameraDriver) render_ffmpeg_command(opt map[string]interface{}) (string, error) {
+	var temp string
+	if val := d.opt.GetString("ffmpeg_template"); val != "" {
+		temp = val
+	} else {
+		temp = FFMPEG_SIMPLE_CAMERA_DRIVER_DEAFULT_TEMPLATE
+	}
+
+	return mustache.Render(temp, opt)
+}
+
+func (d *FFmpegSimpleCameraDriver) parse_ffmpeg_command() (map[string]interface{}, error) {
 	cmd_opt := map[string]interface{}{}
 
 	if val := d.opt.GetString("ffmpeg_file"); val != "" {
@@ -73,86 +91,74 @@ func (d *FFmpegSimpleCameraDriver) parse_ffmpeg_command() (string, error) {
 
 	video_input := d.opt.Sub("video_input")
 	if video_input == nil {
-		return "", new_invalid_config_error("video_input")
+		return nil, new_invalid_config_error("video_input")
 	}
 
 	if val := video_input.GetString("format"); val != "" {
 		cmd_opt["video_input_format"] = val
 	} else {
-		return "", new_invalid_config_error("video_input.format")
+		return nil, new_invalid_config_error("video_input.format")
 	}
 
 	if val := video_input.GetString("file"); val != "" {
 		cmd_opt["video_input_file"] = val
 	} else {
-		return "", new_invalid_config_error("video_input.file")
+		return nil, new_invalid_config_error("video_input.file")
 	}
 
 	if val := video_input.GetString("frame_size"); val != "" {
 		cmd_opt["video_input_frame_size"] = val
 	} else {
-		return "", new_invalid_config_error("video_inpout.frame_size")
+		return nil, new_invalid_config_error("video_inpout.frame_size")
 	}
 
 	if val := video_input.GetString("frame_rate"); val != "" {
 		cmd_opt["video_input_frame_rate"] = val
 	} else {
-		return "", new_invalid_config_error("video_input.frame_rate")
+		return nil, new_invalid_config_error("video_input.frame_rate")
 	}
 
 	video_input_codec := video_input.Sub("codec")
 	if video_input_codec == nil {
-		return "", new_invalid_config_error("codec")
+		return nil, new_invalid_config_error("codec")
 	}
 
 	if val := video_input_codec.GetString("name"); val != "" {
 		cmd_opt["video_input_codec_name"] = val
 	} else {
-		return "", new_invalid_config_error("codec.name")
+		return nil, new_invalid_config_error("codec.name")
 	}
 
 	if val := video_input_codec.GetString("bit_rate"); val != "" {
 		cmd_opt["video_input_codec_bit_rate"] = val
 	} else {
-		return "", new_invalid_config_error("codec.bit_rate")
+		return nil, new_invalid_config_error("codec.bit_rate")
 	}
 
 	if val := video_input_codec.GetStringSlice("extra"); val != nil {
 		cmd_opt["video_input_codec_extra"] = strings.Join(val, " ")
 	} else {
-		return "", new_invalid_config_error("codec.extra")
+		return nil, new_invalid_config_error("codec.extra")
 	}
 
 	output := d.opt.Sub("output")
 	if output == nil {
-		return "", new_invalid_config_error("output")
+		return nil, new_invalid_config_error("output")
 	}
 
 	if val := output.GetString("format"); val != "" {
 		cmd_opt["output_format"] = val
 	} else {
-		return "", new_invalid_config_error("output.format")
+		return nil, new_invalid_config_error("output.format")
 	}
 
 	if val := output.GetString("file_prefix"); val != "" {
 		cmd_opt["output_file"] = path.Join(val, random_strings(64))
 	} else {
-		return "", new_invalid_config_error("output.file_prefix")
+		return nil, new_invalid_config_error("output.file_prefix")
 	}
 
-	var temp string
-	if val := d.opt.GetString("ffmpeg_template"); val != "" {
-		temp = val
-	} else {
-		temp = FFMPEG_SIMPLE_CAMERA_DRIVER_DEAFULT_TEMPLATE
-	}
-
-	cmd_str, err := mustache.Render(temp, cmd_opt)
-	if err != nil {
-		return "", err
-	}
-
-	return cmd_str, nil
+	return cmd_opt, nil
 }
 
 func (d *FFmpegSimpleCameraDriver) start_ffmpeg(ctx context.Context, cmd_str string) (*exec.Cmd, error) {
@@ -177,12 +183,22 @@ func (d *FFmpegSimpleCameraDriver) Start() error {
 	ctx, cfn := context.WithCancel(ctx)
 	d.cancel_func = cfn
 
-	cmd_str, err := d.parse_ffmpeg_command()
+	cmd_opt, err := d.parse_ffmpeg_command()
 	if err != nil {
 		return err
 	}
 
+	cmd_str, err := d.render_ffmpeg_command(cmd_opt)
 	cmd, err := d.start_ffmpeg(ctx, cmd_str)
+	if err != nil {
+		return err
+	}
+
+	output := cmd_opt["output_file"].(string)
+	err = d.mdl.PutObjects(map[string]io.Reader{
+		"rtmp":  strings.NewReader(output),
+		"state": strings.NewReader("on"),
+	})
 	if err != nil {
 		return err
 	}
@@ -209,6 +225,8 @@ func (d *FFmpegSimpleCameraDriver) reset() {
 		d.cancel_func()
 	}
 	d.cancel_func = nil
+	d.mdl.RemoveObject("rtmp")
+	d.mdl.PutObject("state", strings.NewReader("off"))
 	d.st = CAMERA_DRIVER_STATE_OFF
 }
 
@@ -226,12 +244,36 @@ func (d *FFmpegSimpleCameraDriver) Stop() error {
 }
 
 func (d *FFmpegSimpleCameraDriver) State() *CameraDriverState {
+	d.op_mtx.Lock()
+	defer d.op_mtx.Unlock()
+
 	return d.st
 }
 
-func NewFFmpegSimpleCameraDriver(opt *CameraDriverOption) (CameraDriver, error) {
+func NewFFmpegSimpleCameraDriver(opt *CameraDriverOption, args ...interface{}) (CameraDriver, error) {
+	var ok bool
+	var logger log.FieldLogger
+	var module *component.Module
+
+	opt_helper.Setopt(map[string]func(key string, val interface{}) error{
+		"logger": func(key string, val interface{}) error {
+			if logger, ok = val.(log.FieldLogger); !ok {
+				return opt_helper.ErrInvalidArguments
+			}
+			return nil
+		},
+		"module": func(key string, val interface{}) error {
+			if module, ok = val.(*component.Module); !ok {
+				return opt_helper.ErrInvalidArguments
+			}
+			return nil
+		},
+	})(args...)
+
 	drv := &FFmpegSimpleCameraDriver{
 		op_mtx: new(sync.Mutex),
+		logger: logger,
+		mdl:    module,
 		opt:    opt,
 		st:     CAMERA_DRIVER_STATE_OFF,
 	}

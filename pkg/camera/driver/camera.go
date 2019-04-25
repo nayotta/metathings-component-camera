@@ -38,7 +38,7 @@ type CameraDriver interface {
 	State() *CameraDriverState
 }
 
-type CameraDriverFactory func(opt *CameraDriverOption) (CameraDriver, error)
+type CameraDriverFactory func(opt *CameraDriverOption, args ...interface{}) (CameraDriver, error)
 
 var camera_driver_factories map[string]CameraDriverFactory
 var camera_driver_factories_once sync.Once
@@ -51,11 +51,11 @@ func register_camera_driver_factory(name string, fty CameraDriverFactory) {
 	camera_driver_factories[name] = fty
 }
 
-func NewCameraDriver(name string, opt *CameraDriverOption) (CameraDriver, error) {
+func NewCameraDriver(name string, opt *CameraDriverOption, args ...interface{}) (CameraDriver, error) {
 	fty, ok := camera_driver_factories[name]
 	if !ok {
 		return nil, ErrInvalidCameraDriver
 	}
 
-	return fty(opt)
+	return fty(opt, args...)
 }

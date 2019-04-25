@@ -95,7 +95,7 @@ func (cs *CameraService) InitModuleService(m *component.Module) error {
 	cs.module = m
 
 	drv_opt := &driver.CameraDriverOption{cs.module.Kernel().Config().Sub("driver").Raw()}
-	cs.driver, err = driver.NewCameraDriver(drv_opt.GetString("name"), drv_opt)
+	cs.driver, err = driver.NewCameraDriver(drv_opt.GetString("name"), drv_opt, "logger", cs.logger(), "module", cs.module)
 	if err != nil {
 		return err
 	}
