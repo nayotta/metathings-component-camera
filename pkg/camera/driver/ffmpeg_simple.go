@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net/url"
 	"os/exec"
 	"path"
 	"strings"
@@ -153,7 +154,12 @@ func (d *FFmpegSimpleCameraDriver) parse_ffmpeg_command() (map[string]interface{
 	}
 
 	if val := output.GetString("file_prefix"); val != "" {
-		cmd_opt["output_file"] = path.Join(val, random_strings(64))
+		u, err := url.Parse(val + "/" + random_strings(64))
+		if err != nil {
+			return nil, new_invalid_config_error("output.file_prefix")
+		}
+		u.Path = path.Clean(u.Path)
+		cmd_opt["output_file"] = u.String()
 	} else {
 		return nil, new_invalid_config_error("output.file_prefix")
 	}
