@@ -72,7 +72,7 @@ func (f *FFmpegFramework) parse_ffmpeg_command() (string, error) {
 		}
 
 		if val := input.GetString("file"); val != "" {
-			cmd_str += " -i " + val
+			cmd_str += " -i \"" + val + "\""
 		} else {
 			return "", new_invalid_config_error(fmt.Sprintf("inputs.%v.file", k))
 		}
@@ -149,7 +149,7 @@ func (f *FFmpegFramework) parse_ffmpeg_command() (string, error) {
 		}
 
 		if val := output.GetString("file"); val != "" {
-			cmd_str += " " + val
+			cmd_str += " \"" + val + "\""
 		} else {
 			return "", new_invalid_config_error(fmt.Sprintf("outputs.%v.file", k))
 		}

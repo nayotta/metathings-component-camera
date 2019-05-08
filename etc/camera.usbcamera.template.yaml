@@ -1,0 +1,43 @@
+debug:
+  name: camera
+  service:
+    scheme: mtp+grpc
+    host: <host>
+    port: <port>
+  verbose: true
+  log:
+    level: debug
+  heartbeat:
+    interval: 15
+  credential:
+    id: <application-credential-id>
+    secret: <application-credential-secret>
+  service_endpoint:
+    device:
+      address: <device-address>
+    default:
+      address: <metathingsd-address>
+  driver:
+    name: simple  # simple driver, like livego rtmp server.
+    inputs:
+      0:  # input label
+        file: /dev/video0  # usb camera device file
+    outputs:
+      0:  # output label
+        file_prefix: <rtmp-server-address-prefix>  # livego or orther rtmp server with self-define url.
+    framework:
+      name: ffmpeg  # framework name, like `ffmpeg`
+      inputs:
+        0:  # input label, should be equal driver input label
+          format: v4l2  # input format, if input file is usb camera, it should be `v4l2`
+          frame_size: 640x480  # optional, frame size
+          frame_rate: 30  # optional, frame rate
+      output:
+        0:  # output label, should be equal driver output label
+          format: flv  # output format, if output to livego rtmp server, it should be `flv`
+      video:
+        codec:
+          name: h264_omx  # video codec, if running on raspberry pi, `h264_omx` is a good choice.
+          bit_rate: 2000k  # optional, vidoe bit rate.
+          extra:  # optional, extra arguments
+          - "-zerocopy 1"

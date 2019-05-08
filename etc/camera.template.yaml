@@ -1,0 +1,21 @@
+debug:
+  name: camera
+  service:
+    scheme: mtp+grpc
+    host: <host>
+    port: <port>
+  verbose: true
+  log:
+    level: debug
+  heartbeat:
+    interval: 15
+  credential:
+    id: <application-credential-id>
+    secret: <application-credential-secret>
+  service_endpoint:
+    device:
+      address: <device-address>
+    default:
+      address: <metathingsd-address>
+  driver:
+    ...  # driver configs
