@@ -98,7 +98,10 @@ func (d *SimpleCameraDriver) Start() error {
 
 		drv_out_k := "outputs." + k
 		fw.Set(drv_out_k, fw.Get(drv_out_k))
-		fw.Set(fmt.Sprintf("outputs.%v.file", k), u.String())
+
+		// TODO(Peer): accpet multi-outputs
+		output = u.String()
+		fw.Set(fmt.Sprintf("outputs.%v.file", k), output)
 
 		break
 	}
@@ -186,23 +189,12 @@ func (d *SimpleCameraDriver) State() *CameraDriverState {
 }
 
 func NewSimpleCameraDriver(opt *CameraDriverOption, args ...interface{}) (CameraDriver, error) {
-	var ok bool
 	var logger log.FieldLogger
 	var module *component.Module
 
 	opt_helper.Setopt(map[string]func(key string, val interface{}) error{
-		"logger": func(key string, val interface{}) error {
-			if logger, ok = val.(log.FieldLogger); !ok {
-				return opt_helper.ErrInvalidArguments
-			}
-			return nil
-		},
-		"module": func(key string, val interface{}) error {
-			if module, ok = val.(*component.Module); !ok {
-				return opt_helper.ErrInvalidArguments
-			}
-			return nil
-		},
+		"logger": opt_helper.ToLogger(&logger),
+		"module": component.ToModule(&module),
 	})(args...)
 
 	drv := &SimpleCameraDriver{

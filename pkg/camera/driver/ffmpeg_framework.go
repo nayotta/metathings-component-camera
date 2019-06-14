@@ -245,16 +245,10 @@ func (f *FFmpegFramework) Wait() <-chan error {
 }
 
 func NewFFmpegFramework(opt *FrameworkOption, args ...interface{}) (Framework, error) {
-	var ok bool
 	var logger log.FieldLogger
 
 	opt_helper.Setopt(opt_helper.SetoptConds{
-		"logger": func(key string, val interface{}) error {
-			if logger, ok = val.(log.FieldLogger); !ok {
-				return opt_helper.ErrInvalidArguments
-			}
-			return nil
-		},
+		"logger": opt_helper.ToLogger(&logger),
 	})(args...)
 
 	frm := &FFmpegFramework{
