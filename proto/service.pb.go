@@ -9,6 +9,8 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -21,7 +23,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 func init() { proto.RegisterFile("service.proto", fileDescriptor_a0b84a42fa06f626) }
 
@@ -85,6 +87,17 @@ func (c *cameraServiceClient) Stop(ctx context.Context, in *empty.Empty, opts ..
 type CameraServiceServer interface {
 	Start(context.Context, *empty.Empty) (*empty.Empty, error)
 	Stop(context.Context, *empty.Empty) (*empty.Empty, error)
+}
+
+// UnimplementedCameraServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedCameraServiceServer struct {
+}
+
+func (*UnimplementedCameraServiceServer) Start(ctx context.Context, req *empty.Empty) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Start not implemented")
+}
+func (*UnimplementedCameraServiceServer) Stop(ctx context.Context, req *empty.Empty) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Stop not implemented")
 }
 
 func RegisterCameraServiceServer(s *grpc.Server, srv CameraServiceServer) {
