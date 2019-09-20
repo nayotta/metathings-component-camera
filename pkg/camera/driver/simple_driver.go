@@ -146,6 +146,13 @@ func (d *SimpleCameraDriver) Start() error {
 	return nil
 }
 
+func (d *SimpleCameraDriver) Reset() {
+	d.op_mtx.Lock()
+	defer d.op_mtx.Unlock()
+
+	d.reset()
+}
+
 func (d *SimpleCameraDriver) reset() {
 	var err error
 
@@ -204,6 +211,7 @@ func NewSimpleCameraDriver(opt *CameraDriverOption, args ...interface{}) (Camera
 		opt:    opt,
 		st:     CAMERA_DRIVER_STATE_OFF,
 	}
+	drv.Reset()
 
 	return drv, nil
 }
