@@ -1,9 +1,10 @@
 package camera_driver
 
 import (
+	"strings"
 	"sync"
 
-	"github.com/nayotta/viper"
+	"github.com/spf13/viper"
 )
 
 type FrameworkOption struct {
@@ -17,6 +18,29 @@ func (o *FrameworkOption) Sub(key string) *FrameworkOption {
 	}
 
 	return &FrameworkOption{sub}
+}
+
+func (o *FrameworkOption) NextKeys() []string {
+	m := map[string]bool{}
+	for _, k := range o.AllKeys() {
+		ss := strings.SplitN(k, ".", 2)
+		if len(ss) != 2 {
+			continue
+		}
+		k = ss[0]
+		_, ok := m[k]
+		if ok {
+			continue
+		}
+		m[k] = true
+	}
+
+	a := []string{}
+	for x := range m {
+		a = append(a, x)
+	}
+
+	return a
 }
 
 type Framework interface {

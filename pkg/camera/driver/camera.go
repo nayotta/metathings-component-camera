@@ -1,9 +1,10 @@
 package camera_driver
 
 import (
+	"strings"
 	"sync"
 
-	"github.com/nayotta/viper"
+	"github.com/spf13/viper"
 )
 
 type CameraDriverOption struct {
@@ -17,6 +18,29 @@ func (o *CameraDriverOption) Sub(key string) *CameraDriverOption {
 	}
 
 	return &CameraDriverOption{sub}
+}
+
+func (o *CameraDriverOption) NextKeys() []string {
+	m := map[string]bool{}
+	for _, k := range o.AllKeys() {
+		ss := strings.SplitN(k, ".", 2)
+		if len(ss) != 2 {
+			continue
+		}
+		k = ss[0]
+		_, ok := m[k]
+		if ok {
+			continue
+		}
+		m[k] = true
+	}
+
+	a := []string{}
+	for x := range m {
+		a = append(a, x)
+	}
+
+	return a
 }
 
 type CameraDriverState struct {
